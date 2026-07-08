@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Good Cook</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Name screen -->
+<div id="name-screen" style="display:none">
+  <div class="name-card">
+    <div class="name-logo">🍳</div>
+    <h1>The Good Cook</h1>
+    <p>A shared family cookbook</p>
+    <input id="name-input" type="text" placeholder="Your name (e.g. Mum, Dad, Silas…)" maxlength="30" />
+    <button onclick="saveName()">Get cooking →</button>
+  </div>
+</div>
+
+<!-- Main app -->
+<div id="app" style="display:none">
+  <header>
+    <div class="header-inner">
+      <div class="header-left">
+        <span class="app-title">🍳 The Good Cook</span>
+        <span class="version-badge" id="version-badge">v1.8.4</span>
+      </div>
+      <div class="header-right">
+        <span class="user-pill" id="user-pill" onclick="changeName()"></span>
+        <button class="icon-btn" onclick="loadRecipes()" title="Refresh">↻</button>
+      </div>
+    </div>
+    <div id="sync-status" class="sync-status"></div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" onclick="switchTab('browse',this)">Browse</button>
+    <button class="tab" onclick="switchTab('add',this)">Add Recipe</button>
+  </nav>
+
+  <main>
+    <!-- Browse panel -->
+    <div id="panel-browse" class="panel active">
+      <div class="search-bar">
+        <input id="search" type="text" placeholder="Search recipes…" oninput="renderRecipes()">
+      </div>
+      <div id="tag-filters" class="tag-filters"></div>
+      <div id="recipe-count" class="recipe-count"></div>
+      <div id="recipe-grid" class="recipe-grid"></div>
+    </div>
+
+    <!-- Add panel -->
+    <div id="panel-add" class="panel">
+
+      <!-- Add from URL / YouTube -->
+      <section class="add-section">
+        <h2>Add from webpage or YouTube</h2>
+        <p class="add-hint">Paste a recipe webpage or YouTube URL</p>
+        <div class="input-row">
+          <input id="url-input" type="url" placeholder="https://…" />
+          <button onclick="addFromUrl()">Extract</button>
+        </div>
+        <div id="url-status" class="status-msg"></div>
+      </section>
+
+      <!-- Add from text / email -->
+      <section class="add-section">
+        <h2>Add from text or email</h2>
+        <p class="add-hint">Paste a recipe, email, or any text containing a recipe</p>
+        <textarea id="text-input" rows="6" placeholder="Paste recipe text here…"></textarea>
+        <div class="input-row">
+          <label class="file-btn">
+            📎 Upload file
+            <input type="file" accept=".txt,.eml,.pdf" onchange="handleFile(this)" style="display:none">
+          </label>
+          <button onclick="addFromText()">Extract</button>
+        </div>
+        <div id="text-status" class="status-msg"></div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<!-- Detail overlay -->
+<div id="detail-overlay" class="detail-overlay">
+  <div class="detail-inner">
+    <div class="detail-topbar">
+      <button class="back-btn" onclick="closeDetail()">← Back</button>
+      <div class="detail-actions">
+        <button class="icon-btn" id="star-btn" onclick="toggleStar()" title="Favourite">☆</button>
+        <button class="icon-btn" onclick="printRecipe()" title="Print">🖨</button>
+        <button class="icon-btn" onclick="editRecipe()" title="Edit">✏️</button>
+        <button class="icon-btn danger" onclick="deleteRecipe()" title="Delete">🗑</button>
+      </div>
+    </div>
+    <div class="detail-image-wrap" id="detail-image-wrap">
+      <img class="detail-image" id="detail-image" src="" alt="" style="display:none" />
+      <div class="detail-image-actions" id="detail-image-actions">
+        <button class="img-action-btn" id="fetch-img-btn" onclick="fetchImage()" title="Auto-fetch image from source URL">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+          Auto-fetch
+        </button>
+        <label class="img-action-btn" title="Upload your own photo">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Upload photo
+          <input type="file" accept="image/*" onchange="uploadImage(this)" style="display:none">
+        </label>
+        <button class="img-action-btn img-action-danger" id="remove-img-btn" onclick="removeImage()" style="display:none" title="Remove image">✕ Remove</button>
+      </div>
+      <div id="img-status" class="status-msg" style="margin-top:6px"></div>
+    </div>
+    <div class="detail-header">
+      <span class="detail-emoji" id="detail-emoji"></span>
+      <div>
+        <h1 id="detail-title"></h1>
+        <div class="detail-meta">
+          <span id="detail-time"></span>
+          <span id="detail-servings"></span>
+          <span id="detail-source"></span>
+          <span id="detail-added-by" class="added-by-badge"></span>
+        </div>
+      </div>
+    </div>
+    <div class="detail-tags" id="detail-tags"></div>
+    <div class="detail-body">
+      <div class="detail-col">
+        <h3>Ingredients</h3>
+        <div id="detail-ingredients" class="detail-ingredients"></div>
+      </div>
+      <div class="detail-col">
+        <h3>Instructions</h3>
+        <div id="detail-instructions" class="detail-instructions"></div>
+      </div>
+    </div>
+    <div id="detail-notes-wrap" class="detail-notes-wrap">
+      <h3>My Notes</h3>
+      <textarea id="detail-notes" placeholder="Personal notes (private, saved on this device)…" oninput="saveNote()"></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- Edit modal -->
+<div id="edit-modal" class="modal" style="display:none">
+  <div class="modal-inner">
+    <h2>Edit Recipe</h2>
+    <label>Title<input id="edit-title" type="text"></label>
+    <label>Time<input id="edit-time" type="text"></label>
+    <label>Servings<input id="edit-servings" type="text"></label>
+    <label>Tags (comma-separated)<input id="edit-tags" type="text"></label>
+    <label>Ingredients<textarea id="edit-ingredients" rows="8"></textarea></label>
+    <label>Instructions<textarea id="edit-instructions" rows="10"></textarea></label>
+    <label>Notes<textarea id="edit-recipe-notes" rows="3"></textarea></label>
+    <div class="modal-btns">
+      <button onclick="saveEdit()">Save</button>
+      <button class="secondary" onclick="closeEdit()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
