@@ -30,7 +30,7 @@ exports.handler = async () => {
       try {
         await tursoRun(
           'INSERT INTO recipes (title,ingredients,instructions,time,servings,tags,notes,emoji,source,source_label,source_url,image_url,added_by,starred,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-          [t(b.title),t(b.ingredients),t(b.instructions),t(b.time),t(b.servings),t(JSON.stringify(b.tags||[])),t(b.notes),t(b.emoji||'🍴'),t(b.source),t(b.source_label),s(b.source_url),s(b.image_url),t(b.added_by),{type:'integer',value:b.starred||0},t(b.created_at)]
+          [t(b.title),t(b.ingredients),t(b.instructions),t(b.time),t(b.servings),t(JSON.stringify(b.tags||[])),t(b.notes),t(b.emoji||'🍴'),t(b.source),t(b.source_label),s(b.source_url),s(b.image_url),t(b.added_by),t(b.starred?'1':'0'),t(b.created_at)]
         );
         inserted++;
       } catch(e) {

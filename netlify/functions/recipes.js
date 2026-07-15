@@ -75,7 +75,7 @@ exports.handler = async (event) => {
           { type:'text', value: b.source_url||'' },
           { type:'text', value: b.image_url||'' },
           { type:'text', value: b.added_by||'' },
-          { type:'integer', value: b.starred ? 1 : 0 }
+          { type:'text', value: b.starred ? '1' : '0' }
         ]
       );
       return { statusCode: 201, headers: cors, body: JSON.stringify({ id: result?.last_insert_rowid }) };
@@ -88,18 +88,18 @@ exports.handler = async (event) => {
         if (key in b) {
           fields.push(`${key} = ?`);
           if (key === 'tags') args.push({ type:'text', value: JSON.stringify(b[key]) });
-          else if (key === 'starred') args.push({ type:'integer', value: b[key] ? 1 : 0 });
+          else if (key === 'starred') args.push({ type:'text', value: b[key] ? '1' : '0' });
           else args.push({ type:'text', value: b[key] == null ? '' : String(b[key]) });
         }
       }
       if (!fields.length) return { statusCode:400, headers:cors, body: JSON.stringify({ error:'Nothing to update' }) };
-      args.push({ type:'integer', value: parseInt(id) });
+      args.push({ type:'text', value: String(id) });
       await turso(`UPDATE recipes SET ${fields.join(', ')} WHERE id = ?`, args);
       return { statusCode: 200, headers: cors, body: JSON.stringify({ ok: true }) };
     }
 
     if (method === 'DELETE') {
-      await turso('DELETE FROM recipes WHERE id = ?', [{ type:'integer', value: parseInt(id) }]);
+      await turso('DELETE FROM recipes WHERE id = ?', [{ type:'text', value: String(id) }]);
       return { statusCode: 204, headers: cors, body: '' };
     }
 
