@@ -2,16 +2,12 @@ exports.handler = async () => {
   const TURSO_URL = process.env.TURSO_URL;
   const TURSO_TOKEN = process.env.TURSO_TOKEN;
   const cors = { 'Content-Type': 'application/json' };
-
   try {
     const r = await fetch(`${TURSO_URL}/v2/pipeline`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${TURSO_TOKEN}`,
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Authorization': `Bearer ${TURSO_TOKEN}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        requests: [{ type: 'execute', stmt: { sql: 'SELECT * FROM recipes LIMIT 2' } }]
+        requests: [{ type: 'execute', stmt: { sql: 'SELECT id, title FROM recipes LIMIT 3' } }]
       })
     });
     const data = await r.json();
