@@ -41,10 +41,11 @@ exports.handler = async (event) => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT, ingredients TEXT, instructions TEXT, time TEXT, servings TEXT,
       tags TEXT, notes TEXT, emoji TEXT, source TEXT, source_label TEXT,
-      source_url TEXT, image_url TEXT, added_by TEXT,
+      source_url TEXT, image_url TEXT, image_data TEXT, added_by TEXT,
       starred INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now'))
     )`);
+    await turso('ALTER TABLE recipes ADD COLUMN image_data TEXT').catch(() => {});
 
     if (method === 'GET') {
       const result = await turso('SELECT id,title,ingredients,instructions,time,servings,tags,notes,emoji,source,source_label,source_url,image_url,image_data,added_by,starred,created_at FROM recipes ORDER BY created_at DESC');
