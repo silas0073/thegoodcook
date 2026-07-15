@@ -6,13 +6,8 @@ const TURSO_TOKEN = process.env.TURSO_TOKEN;
 async function tursoExec(sql, args = []) {
   const r = await fetch(`${TURSO_URL}/v2/pipeline`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${TURSO_TOKEN}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      requests: [{ type: 'execute', stmt: { sql, args } }]
-    })
+    headers: { 'Authorization': `Bearer ${TURSO_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ requests: [{ type: 'execute', stmt: { sql, args } }] })
   });
   const data = await r.json();
   const result = data.results?.[0];
@@ -20,10 +15,17 @@ async function tursoExec(sql, args = []) {
   return result?.response?.result;
 }
 
+function t(value) { return { type: 'text', value: value == null ? '' : String(value) }; }
+function i(value) { return { type: 'integer', value: value ? 1 : 0 }; }
+
 exports.handler = async () => {
   const cors = { 'Content-Type': 'application/json' };
+  const errors = [];
 
   try {
+    // Clear existing (the test row)
+    await tursoExec('DELETE FROM recipes');
+
     // Fetch from Supabase
     const r = await fetch(`${SUPABASE_URL}/rest/v1/recipes?order=created_at.asc`, {
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
@@ -31,46 +33,31 @@ exports.handler = async () => {
     const recipes = await r.json();
     if (!Array.isArray(recipes)) throw new Error('Supabase fetch failed: ' + JSON.stringify(recipes));
 
-    // Try inserting just the first recipe with plain INSERT and return full Turso response
-    const b = recipes[0];
-    const tags = Array.isArray(b.tags) ? b.tags : [];
+    let inserted = 0;
+    for (const b of recipes) {
+      try {
+        const tags = Array.isArray(b.tags) ? b.tags : [];
+        await tursoExec(
+          `INSERT INTO recipes (title, ingredients, instructions, time, servings, tags, notes, emoji, source, source_label, source_url, image_url, added_by, starred, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            t(b.title), t(b.ingredients), t(b.instructions), t(b.time), t(b.servings),
+            t(JSON.stringify(tags)), t(b.notes), t(b.emoji || '🍴'),
+            t(b.source), t(b.source_label), t(b.source_url), t(b.image_url),
+            t(b.added_by), i(b.starred), t(b.created_at || new Date().toISOString())
+          ]
+        );
+        inserted++;
+      } catch (e) {
+        errors.push({ title: b.title, error: e.message });
+      }
+    }
 
-    const raw = await fetch(`${TURSO_URL}/v2/pipeline`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${TURSO_TOKEN}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        requests: [{
-          type: 'execute',
-          stmt: {
-            sql: 'INSERT INTO recipes (title, tags, added_by) VALUES (?, ?, ?)',
-            args: [
-              { type: 'text', value: String(b.title || 'test') },
-              { type: 'text', value: JSON.stringify(tags) },
-              { type: 'text', value: String(b.added_by || '') }
-            ]
-          }
-        }]
-      })
-    });
-    const rawData = await raw.json();
-
-    // Check count
-    const countResult = await tursoExec('SELECT COUNT(*) as n FROM recipes');
+    const countResult = await tursoExec('SELECT COUNT(*) FROM recipes');
     const count = countResult?.rows?.[0]?.[0]?.value ?? '?';
 
-    return {
-      statusCode: 200,
-      headers: cors,
-      body: JSON.stringify({ 
-        first_recipe: b.title,
-        turso_insert_response: rawData,
-        turso_count: count 
-      }, null, 2)
-    };
+    return { statusCode: 200, headers: cors, body: JSON.stringify({ ok: true, migrated: inserted, turso_count: count, errors }) };
   } catch (err) {
-    return { statusCode: 500, headers: cors, body: JSON.stringify({ error: err.message }) };
+    return { statusCode: 500, headers: cors, body: JSON.stringify({ error: err.message, errors }) };
   }
 };
