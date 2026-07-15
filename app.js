@@ -1,4 +1,4 @@
-const APP_VERSION = '1.8.6';
+const APP_VERSION = '1.9.0';
 document.getElementById('version-badge').textContent = 'v' + APP_VERSION;
 
 // ===== STATE =====
