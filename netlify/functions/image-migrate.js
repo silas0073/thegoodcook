@@ -29,7 +29,7 @@ export default async () => {
   const results = [];
 
   // Get all recipes with image URLs
-  const dbResult = await tursoRun('SELECT id, title, image_url FROM recipes WHERE image_url IS NOT NULL AND image_url != ""');
+  const dbResult = await tursoRun('SELECT id, title, image_url FROM recipes');
   const recipes = rowsToObjects(dbResult);
 
   for (const recipe of recipes) {
