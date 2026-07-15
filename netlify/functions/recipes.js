@@ -48,12 +48,11 @@ exports.handler = async (event) => {
     await turso('ALTER TABLE recipes ADD COLUMN image_data TEXT').catch(() => {});
 
     if (method === 'GET') {
-      const result = await turso('SELECT id,title,ingredients,instructions,time,servings,tags,notes,emoji,source,source_label,source_url,image_url,image_data,added_by,starred,created_at FROM recipes ORDER BY created_at DESC');
+      const result = await turso('SELECT id,title,ingredients,instructions,time,servings,tags,notes,emoji,source,source_label,source_url,image_url,added_by,starred,created_at FROM recipes ORDER BY created_at DESC');
       const rows = rowsToObjects(result).map(r => ({
         ...r,
         tags: r.tags ? JSON.parse(r.tags) : [],
-        starred: r.starred === 1 || r.starred === '1',
-        image_url: r.image_data || r.image_url || null
+        starred: r.starred === 1 || r.starred === '1'
       }));
       return { statusCode: 200, headers: cors, body: JSON.stringify(rows) };
     }
