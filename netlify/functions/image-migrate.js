@@ -1,6 +1,5 @@
-// Fetches all images from Supabase and stores in Netlify Blobs
-// Then updates Turso recipe records with new URLs
-import { getStore } from '@netlify/blobs';
+// Regular Netlify function (not edge) - longer timeout
+const { getStore } = require('@netlify/blobs');
 
 const TURSO_URL = process.env.TURSO_URL;
 const TURSO_TOKEN = process.env.TURSO_TOKEN;
@@ -24,53 +23,48 @@ function rowsToObjects(result) {
   );
 }
 
-export default async () => {
-  const store = getStore('recipe-images');
+exports.handler = async () => {
+  const cors = { 'Content-Type': 'application/json' };
   const results = [];
 
-  // Get all recipes with image URLs
-  const dbResult = await tursoRun('SELECT id, title, image_url FROM recipes');
-  const recipes = rowsToObjects(dbResult);
+  try {
+    const store = getStore('recipe-images');
 
-  for (const recipe of recipes) {
-    try {
-      // Skip if already on Netlify
-      if (!recipe.image_url.includes('supabase.co')) {
-        results.push({ title: recipe.title, status: 'skipped - not supabase' });
+    // Get all recipes
+    const dbResult = await tursoRun('SELECT id, title, image_url FROM recipes');
+    const recipes = rowsToObjects(dbResult);
+
+    for (const recipe of recipes) {
+      if (!recipe.image_url || !recipe.image_url.includes('supabase.co')) {
+        results.push({ title: recipe.title, status: 'skipped' });
         continue;
       }
 
-      // Fetch image from Supabase
-      const imgRes = await fetch(recipe.image_url);
-      if (!imgRes.ok) throw new Error(`Fetch failed: ${imgRes.status}`);
+      try {
+        const imgRes = await fetch(recipe.image_url, { signal: AbortSignal.timeout(10000) });
+        if (!imgRes.ok) throw new Error(`Fetch ${imgRes.status}`);
 
-      const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
-      const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
-      const key = `recipe-${recipe.id}.${ext}`;
-      const buffer = await imgRes.arrayBuffer();
+        const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+        const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
+        const key = `recipe-${recipe.id}.${ext}`;
+        const buffer = await imgRes.arrayBuffer();
 
-      // Save to Netlify Blobs
-      await store.set(key, buffer, { metadata: { contentType } });
+        await store.set(key, buffer, { metadata: { contentType } });
 
-      // Update Turso with new URL
-      const newUrl = `/.netlify/functions/image-proxy?key=${key}`;
-      // Use absolute URL for storage
-      const publicUrl = `/api/image?key=${key}`;
-      await tursoRun(
-        'UPDATE recipes SET image_url = ? WHERE id = ?',
-        [{ type: 'text', value: publicUrl }, { type: 'text', value: String(recipe.id) }]
-      );
+        const publicUrl = `/api/image?key=${key}`;
+        await tursoRun(
+          'UPDATE recipes SET image_url = ? WHERE id = ?',
+          [{ type: 'text', value: publicUrl }, { type: 'text', value: String(recipe.id) }]
+        );
 
-      results.push({ title: recipe.title, status: 'ok', key });
-    } catch (e) {
-      results.push({ title: recipe.title, status: 'error', error: e.message });
+        results.push({ title: recipe.title, status: 'ok', key });
+      } catch (e) {
+        results.push({ title: recipe.title, status: 'error', error: e.message });
+      }
     }
+
+    return { statusCode: 200, headers: cors, body: JSON.stringify({ ok: true, results }) };
+  } catch (err) {
+    return { statusCode: 500, headers: cors, body: JSON.stringify({ error: err.message, results }) };
   }
-
-  return new Response(JSON.stringify({ ok: true, results }, null, 2), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' }
-  });
 };
-
-export const config = { path: '/api/image-migrate' };
