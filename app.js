@@ -1,4 +1,4 @@
-const APP_VERSION = '1.9.5';
+const APP_VERSION = '1.9.6';
 document.getElementById('version-badge').textContent = 'v' + APP_VERSION;
 
 // ===== STATE =====
@@ -308,27 +308,18 @@ async function uploadImage(input) {
   const reader = new FileReader();
   reader.onload = async (e) => {
     try {
-      const SUPABASE_URL = 'https://jiejwvpjpejpozzxuamf.supabase.co';
-      const ext = file.name.split('.').pop() || 'jpg';
-      const filename = `recipe-${currentId}.${ext}`;
-      const r = await fetch(`/.netlify/functions/recipes`); // just to get ANON key via proxy not needed
-      // Upload directly via Supabase public upload
-      const base64 = e.target.result.split(',')[1];
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/recipe-images/${filename}`, {
+      const res = await fetch('/.netlify/functions/fetch-image', {
         method: 'POST',
-        headers: { 'Content-Type': file.type, 'x-upsert': 'true' },
-        body: bytes
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl: e.target.result, recipeId: currentId })
       });
-      if (!uploadRes.ok) throw new Error('Upload failed');
-      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/recipe-images/${filename}`;
-      await updateRecipeOnServer(currentId, { image_url: publicUrl });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || 'Upload failed');
+      await updateRecipeOnServer(currentId, { image_url: data.url });
       const rec = recipes.find(x => String(x.id) === String(currentId));
-      if (rec) rec.image_url = publicUrl;
+      if (rec) rec.image_url = data.url;
       const img = document.getElementById('detail-image');
-      img.src = publicUrl; img.style.display = 'block';
+      img.src = data.url; img.style.display = 'block';
       const removeBtn = document.getElementById('remove-img-btn');
       if (removeBtn) removeBtn.style.display = 'inline-flex';
       setImgStatus('success', '✓ Photo uploaded');
@@ -338,6 +329,7 @@ async function uploadImage(input) {
   reader.readAsDataURL(file);
   input.value = '';
 }
+
 
 async function removeImage() {
   const r = recipes.find(x => String(x.id) === String(currentId));
